@@ -1,6 +1,8 @@
 import pandas as pd
 import torch
-from torch.utils.data import Dataset, dataloader
+import numpy as np
+import dill as pickle
+from torch.utils.data import Dataset, Dataloader
 from torch.nn.utils.rnn import pad_sequence
 from torchtext.vocab import build_vocab_from_iterator
 from Tokenize import tokenize
@@ -57,4 +59,69 @@ class TranslationDataset(Dataset):
         raw_src_sentence, raw_trg_sentence = self.src_text[idx], self.trg_text[idx]
         return self.src_tokenizer(raw_src_sentence), self.trg_tokenizer(raw_trg_sentence)
 
-def build_dataset
+def collate_fn(b, src_vocab, trg_vocab, opt): 
+    src_batch, trg_batch = [], []
+    for src, trg in b: 
+
+        src_tensor = torch.tensor([src_vocab[token] for token in src], dtype=torch.long)
+        trg_tensor = torch.tensor(
+            [trg_vocab["<sos>"]] + [trg_vocab[token] for token in trg] + trg_vocab["<eos>"], dtype=torch.long
+        )
+        src_batch.append(src_tensor)
+        trg_batch.append(trg_tensor)
+
+    src_batch = pad_sequence(src_batch, padding_value=src_vocab["<pad>"], batch_first=True)
+    trg_batch = pad_sequence(trg_batch, padding_value=trg_batch["<pad>"], batch_first=True)
+
+    return src_batch.to(opt.device), trg_batch.to(opt.device)
+
+def build_dataset(opt): 
+
+    spacy_langs = ['en_core_web_sm', 'fr_core_news_sm', 'de', 'es', 'pt', 'it', 'nl']
+    if opt.src_lang not in spacy_langs: 
+        print('invalid src language: ' + opt.src_lang + 'supported language : ' + str(spacy_langs))
+        quit()
+
+    if opt.trg_lang not in spacy_langs:
+        print('invalid src language: ' + opt.trg_lang + 'supported language : ' + str(spacy_langs))
+        quit()
+
+    print("loading spacy tokenizers...")
+
+    t_src = tokenize(opt.src_lang)
+    t_trg = tokenize(opt.trg_lang)
+
+    raw_data = {'src' : [line for line in opt.src_data], 'trg' : [line for line in opt.trg_data]}
+
+    df = pd.DataFrame(raw_data, columns=["src", "trg"])
+    mask = (df['src'].str.count(' ') < opt.max_strlen) & (df['trg'].str.count(' ') < opt.max_strlen) 
+
+    df_flitered = df[mask]
+    opt.src_data, opt.trg_data = df_flitered['src'].tolist(), df_flitered['trg'].tolist()
+
+    dataset = TranslationDataset(opt)
+    
+    if opt.load_weights is None:
+        src_vocab, trg_vocab = build_vocab(opt)
+
+    train_iter = Dataloader(
+        dataset, 
+        batch_size=opt.batchsize,
+        shuffle=True,
+        collate_fn=lambda b: collate_fn(b, src_vocab, trg_vocab, opt)
+    )
+
+    return train_iter, src_vocab, trg_vocab
+
+def get_vocab(opt): 
+
+    if opt.load_weights is not None:
+        try: 
+            print("loading presaved fields...")
+            src_vocab = pickle.load(open(f'{opt.laod_weights}/SRC.pkl', 'rb'))
+            trg_vocab = pickle.load(open(f'{opt.laod_weights}/TRG.pkl', 'rb'))
+        except: 
+            print("error openning SRC.pkl and txt.pkl files, please ensure they are in " + opt.load_weights + "/")
+            quit()
+
+    return src_vocab, trg_vocab
