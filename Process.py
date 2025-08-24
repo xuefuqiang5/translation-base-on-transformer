@@ -2,7 +2,7 @@ import pandas as pd
 import torch
 import numpy as np
 import dill as pickle
-from torch.utils.data import Dataset, Dataloader
+from torch.utils.data import Dataset, DataLoader
 from torch.nn.utils.rnn import pad_sequence
 from torchtext.vocab import build_vocab_from_iterator
 from Tokenize import tokenize
@@ -65,13 +65,15 @@ def collate_fn(b, src_vocab, trg_vocab, opt):
 
         src_tensor = torch.tensor([src_vocab[token] for token in src], dtype=torch.long)
         trg_tensor = torch.tensor(
-            [trg_vocab["<sos>"]] + [trg_vocab[token] for token in trg] + trg_vocab["<eos>"], dtype=torch.long
+            [trg_vocab["<sos>"]] + [trg_vocab[token] for token in trg] + [trg_vocab["<eos>"]], dtype=torch.long
         )
         src_batch.append(src_tensor)
         trg_batch.append(trg_tensor)
 
     src_batch = pad_sequence(src_batch, padding_value=src_vocab["<pad>"], batch_first=True)
-    trg_batch = pad_sequence(trg_batch, padding_value=trg_batch["<pad>"], batch_first=True)
+    trg_batch = pad_sequence(trg_batch, padding_value=trg_vocab["<pad>"], batch_first=True)
+
+    
 
     return src_batch.to(opt.device), trg_batch.to(opt.device)
 
@@ -103,8 +105,9 @@ def build_dataset(opt):
     
     if opt.load_weights is None:
         src_vocab, trg_vocab = build_vocab(opt)
-
-    train_iter = Dataloader(
+    print("#" * 30)
+    print(f'the padding character index is {src_vocab["<pad>"]}')
+    train_iter = DataLoader(
         dataset, 
         batch_size=opt.batchsize,
         shuffle=True,
