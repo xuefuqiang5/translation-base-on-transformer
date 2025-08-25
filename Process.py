@@ -105,8 +105,7 @@ def build_dataset(opt):
     
     if opt.load_weights is None:
         src_vocab, trg_vocab = build_vocab(opt)
-    print("#" * 30)
-    print(f'the padding character index is {src_vocab["<pad>"]}')
+
     train_iter = DataLoader(
         dataset, 
         batch_size=opt.batchsize,

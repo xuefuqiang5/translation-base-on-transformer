@@ -30,12 +30,9 @@ def main():
     opt.device = 'cuda' if opt.no_cuda is False else 'cpu'
     if opt.device == 'cuda': 
         assert torch.cuda.is_available()
-    print(opt) 
-    read_data(opt) 
-    train_iter, src_vocab, trg_vocab = build_dataset(opt)
-    for batch_idx, batch in enumerate(train_iter):
-        print(f"批次 {batch_idx}:")
-        print(f"批次大小: {len(batch)}") 
 
+    read_data(opt)
+    train_iter, src_vocab, trg_vocab = build_dataset(opt)
+    
 if __name__ == "__main__":
     main()
